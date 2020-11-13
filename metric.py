@@ -18,7 +18,7 @@ def dice_coef_multi_class(y_true, y_pred, axis=(1, 2, 3), epsilon=1e-6):
 
 
     intersection = K.sum(y_true * y_pred, axis=axis)
-    area_true = K.sum(y_true_ axis=axis)
+    area_true = K.sum(y_true, axis=axis)
     area_pred = K.sum(y_pred, axis=axis)
 
     summation = area_true + area_pred

@@ -353,6 +353,7 @@ class DataGenerator(keras.utils.Sequence):
         # this function loads the .nii.gz from a Folder and save it in a 3D array: x, y, z
         # the files in the Nifti array must be saved in the form 100_00100904_0.nii.gz
         # with 100_00100904_0 the caseNumber
+        
         pathToNiiGz = pathToNiiFolder + '/' + caseNumber + imageType
         
         image_array = np.asanyarray(nib.load(pathToNiiGz).dataobj).squeeze()

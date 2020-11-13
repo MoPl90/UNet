@@ -38,10 +38,10 @@ def dice_loss_multi_class(y_true, y_pred, numClasses=3):
         dice_multi -= dice_coef_multi_class(y_true[:, :, :, :, index], y_pred[:, :, :, :, index])
     return dice_multi
 
-def dice_loss_multi_class_no_background(y_true, y_pred, numClasses=3):
+def dice_loss_multi_class_no_background(y_true, y_pred, numClasses=3, epsilon=1e-6):
     dice_multi=0
     for index in range(numClasses-1):
-        dice_multi -= dice_coef_multi_class(y_true[:, :, :, :, index+1], y_pred[:, :, :, :, index+1])
+        dice_multi -= dice_coef_multi_class(y_true[:, :, :, :, index+1], y_pred[:, :, :, :, index+1], epsilon=epsilon)
     return dice_multi
 
 def jaccard_loss(y_true, y_pred, weights=[0.1, 0.9]):

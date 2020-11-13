@@ -78,7 +78,8 @@ def _conv_3D(**layer_params):
             padding=padding,
             dilation_rate=dilation_rate,
             kernel_initializer=kernel_initializer,
-            activation=activation)(input_tensor)
+            activation=activation,
+            use_bias=False)(input_tensor)
 
         return conv
 
@@ -112,7 +113,8 @@ def _deconv_3D(**layer_params):
             padding=padding,
             dilation_rate=dilation_rate,
             kernel_initializer=kernel_initializer,
-            activation=activation)(input_tensor)
+            activation=activation,
+            use_bias=False)(input_tensor)
         return conv
 
     return func

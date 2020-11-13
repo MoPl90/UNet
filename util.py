@@ -458,9 +458,12 @@ def chunks(list_of_cases, k):
     for i in range(0, len(list_of_cases), k):
         yield list_of_cases[i:i+k]
 
-def generatePartitionCrossValidation(imagePathFolder, k, shuffle_train, image_type='.dcm'):
+def generatePartitionCrossValidation(imagePathFolder, k, shuffle_train, labelPathFolder=None, image_type='.dcm', label_type='.nii', threshold=20):
     list_of_cases = listOfCasesInFolder(imagePathFolder, image_type)
     
+    if labelPathFolder is not None:
+        list_of_cases = removeStrokeBelowThreshold(list_of_cases, labelPathFolder, image_type=label_type, threshold=threshold)
+
     n = int(np.ceil(len(list_of_cases)/k))
     
     if shuffle_train:
@@ -498,7 +501,9 @@ def addNoise(X, threshold, meanNoiseDistribution, noiseMultiplicationFactor):
 
     X = np.multiply(X,mask)
 
-    stddevNoiseDistribution = noiseMultiplicationFactor * np.std(X[X > threshold])
+    factor = np.random.uniform(0, noiseMultiplicationFactor)
+    print(factor)
+    stddevNoiseDistribution = factor * np.std(X[X > threshold])
 
     # where loc is the mean and scale is the std dev
     noiseToAdd = scipy.stats.norm.rvs(loc=meanNoiseDistribution, scale=stddevNoiseDistribution, size = X.shape)
@@ -611,9 +616,13 @@ def simpleNormalization(array):
     else:
         vol -= np.max(vol[0:20,:,-1])
 
-    vol = np.clip(vol,0,np.percentile(vol[35:100, 35:100, 6:32],99.5))
+    # vol = np.clip(vol,0,np.percentile(vol[35:100, 35:100, 6:32],99.5))
+    # vol /= np.max(vol)
 
-    vol = vol/np.amax(vol)
+    vol -= np.mean(vol)
+    vol /= np.std(vol)
+    vol = -1 + (vol - np.min(vol)) / (np.max(vol) - np.min(vol))
+
     return vol
 
 
