@@ -17,7 +17,7 @@ from keras.losses import categorical_crossentropy
 from shutil import copyfile
 
 from util import generatePartitionTrainAndValidFromFolderRandomly
-from dataGenerator import DataGenerator
+from data_generator import DataGenerator
 from keras.callbacks import *
 from unet_3D import UNet_3D
 
@@ -237,11 +237,12 @@ if __name__ == "__main__":
 
     # Set up graphics card settings.
     os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
+    os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
     
     # Generate training/test partition.
-    train_ids = generatePartitionTrainAndValidFromFolderRandomly(gen_param['imgPath'], gen_param['validprop'], gen_param['shuffletrain'], gen_param['labelPath'], gen_param['imgType'], gen_param["labelType"], threshold=gen_param["thresh"])
-    test_ids = generatePartitionTrainAndValidFromFolderRandomly(val_param['imgPath'], val_param['validprop'], val_param['shuffletrain'], val_param['labelPath'], val_param['imgType'], val_param["labelType"], threshold=val_param["thresh"])
+    train_ids = generatePartitionTrainAndValidFromFolderRandomly(gen_param['imgPath'], gen_param['validprop'], gen_param['shuffletrain'], gen_param['imgType'], gen_param['labelPath'], gen_param["labelType"], threshold=gen_param["thresh"])
+    test_ids = generatePartitionTrainAndValidFromFolderRandomly(val_param['imgPath'], val_param['validprop'], val_param['shuffletrain'], val_param['imgType'], val_param['labelPath'], val_param["labelType"], threshold=val_param["thresh"])
 
     # Generate data generator objects.
     training_generator   = DataGenerator(train_ids['train'], gen_param['imgPath'], gen_param['labelPath'], norm_param, gen_param["augment"], aug_param, **misc_param_gen)

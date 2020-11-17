@@ -6,7 +6,6 @@ def dice_coef(y_true, y_pred, axis=(1, 2, 3), epsilon=1e-6):
     y_pred_cal = y_pred[:, :, :, :, 1]
     y_true_cal = y_true[:, :, :, :, 1]
 
-
     intersection = K.sum(y_true_cal * y_pred_cal, axis=axis)
     area_true = K.sum(y_true_cal, axis=axis)
     area_pred = K.sum(y_pred_cal, axis=axis)

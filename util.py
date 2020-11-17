@@ -422,7 +422,7 @@ def removeStrokeBelowThreshold(listOfCases, labelsPathFolder, image_type='.dcm',
 
     return valid
 
-def generatePartitionTrainAndValidFromFolderRandomly(imagePathFolder,_validProportion,shuffle_train_val, labelPathFolder=None, image_type='.dcm', label_type='.nii', threshold=20):
+def generatePartitionTrainAndValidFromFolderRandomly(imagePathFolder, _validProportion, shuffle_train_val, image_type='.dcm', labelPathFolder=None, label_type='.nii', threshold=20):
     # generate List of train and valid IDs from the DicomFolderPaths randomly
 
     _listOfCases = listOfCasesInFolder(imagePathFolder, image_type)
@@ -475,7 +475,7 @@ def listOfCasesInFolder(pathToFolder, image_type='.dcm'):
     listOfImages = []
     listOfFiles = os.listdir(pathToFolder)
     for f in listOfFiles:
-        if f.endswith(image_type):
+        if f.endswith(image_type) and f[0] != '.':
             listOfImages.append(f.split('.')[0])
     
     return list(listOfImages)
@@ -502,7 +502,7 @@ def addNoise(X, threshold, meanNoiseDistribution, noiseMultiplicationFactor):
     X = np.multiply(X,mask)
 
     factor = np.random.uniform(0, noiseMultiplicationFactor)
-    print(factor)
+
     stddevNoiseDistribution = factor * np.std(X[X > threshold])
 
     # where loc is the mean and scale is the std dev
@@ -616,7 +616,7 @@ def simpleNormalization(array):
     else:
         vol -= np.max(vol[0:20,:,-1])
 
-    # vol = np.clip(vol,0,np.percentile(vol[35:100, 35:100, 6:32],99.5))
+    vol = np.clip(vol,0,np.percentile(vol,99.5))
     # vol /= np.max(vol)
 
     vol -= np.mean(vol)
@@ -627,7 +627,6 @@ def simpleNormalization(array):
 
 
 def mosaic(Image3D,numberOfRows=5):
-    # returns a mosaic 2D image for a 3D image, by flattening the third dimension
 
     numberOfImages = Image3D.shape[2]
     img_list = [Image3D[:, :, i] for i in range(numberOfImages)]
