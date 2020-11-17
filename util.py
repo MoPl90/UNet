@@ -625,7 +625,9 @@ def simpleNormalization(array):
 
     return vol
 
-
+def CTNormalization(array):
+    return np.clip(array, 0.001, 100)
+    
 def mosaic(Image3D,numberOfRows=5):
 
     numberOfImages = Image3D.shape[2]

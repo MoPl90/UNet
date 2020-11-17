@@ -134,9 +134,9 @@ class DataGenerator(keras.utils.Sequence):
             if (self.normalization_args['simpleNormalize'] == 1):
                 X_temp = simpleNormalization(X_temp)
 
-            # # CTNormalization
-            # if (self.normalization_args['ctNormalize'] == 1):
-            #     X_temp = CTNormalization(X_temp)
+            # CTNormalization
+            if (self.normalization_args['ctNormalize'] == 1):
+                X_temp = CTNormalization(X_temp)
 
             # gaussian filter
             if (self.normalization_args['gaussian_filter'] == 1):
