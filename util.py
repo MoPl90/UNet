@@ -621,7 +621,7 @@ def simpleNormalization(array):
 
     vol -= np.mean(vol)
     vol /= np.std(vol)
-    vol = -1 + (vol - np.min(vol)) / (np.max(vol) - np.min(vol))
+    vol = -1 + 2 * (vol - np.min(vol)) / (np.max(vol) - np.min(vol))
 
     return vol
 
