@@ -1,9 +1,7 @@
-from keras import *
-
-from keras.objectives import *
-from keras.callbacks import *
-from keras.layers import Input, Activation, Reshape, Lambda
-from keras.models import Model
+# from tensorflow.keras.objectives import *
+from tensorflow.keras.callbacks import *
+from tensorflow.keras.layers import Input, Activation, Reshape, Lambda
+from tensorflow.keras.models import Model
 
 
 # from layers import _conv, _mean_var_norm
@@ -15,9 +13,9 @@ from layers_3D import _make_bn_act_conv_block_3D, _bn_act_conv_3D, _make_deconv_
 from layers_3D import _make_conv_bn_act_block_3D, _conv_bn_act_3D, _make_bn_act_deconv_block_3D
 
 
-from keras.layers import Dense
+from tensorflow.keras.layers import Dense
 
-import keras.backend as K
+import tensorflow.keras.backend as K
 
 from util import *
 

@@ -1,7 +1,7 @@
-from keras import backend as K
+from tensorflow.keras import backend as K
 
 import numpy as np
-import keras as keras
+import tensorflow.keras as keras
 import pydicom
 import glob
 from PIL import Image
@@ -12,8 +12,9 @@ import datetime
 import os
 import matplotlib.pyplot as plt
 import nibabel as nib
+from tensorflow.keras.utils import to_categorical, Sequence
 
-class DataGenerator(keras.utils.Sequence):
+class DataGenerator(Sequence):
 
     def __init__(self, list_IDs, imagePathFolder, labelPathFolder, normalization_args, augment, augmentation_args, preload_data = False, imageType = '.dcm', labelType = '.dcm', batch_size=32, dim=(32, 32, 32), crop_parameters=[0,10,0,10,0,10], n_channels=1, n_classes=10, shuffle=True, variableTypeX = 'float32', variableTypeY = 'float32', savePath = None, preload=False, spade_norm=False, lr_seg=False, **kwargs):
 
@@ -136,7 +137,7 @@ class DataGenerator(keras.utils.Sequence):
 
             # The intensity augmentation can only be used WITHOUt prior rescaling to [0,1] of [-1,1]!
             elif (self.normalization_args['intensityNormalize'] == 1):
-                X_temp = intensityNormalization(X_temp)
+                X_temp = intensityNormalization(X_temp, augment=self.augment)
 
             # CTNormalization
             if (self.normalization_args['ctNormalize'] == 1):
@@ -149,7 +150,7 @@ class DataGenerator(keras.utils.Sequence):
             #assign final data
             #--------------------
             X[i,] = X_temp
-            Y[i,] = keras.utils.to_categorical(Y_temp[...,0], num_classes=self.n_classes, dtype=self.variableTypeY)
+            Y[i,] = to_categorical(Y_temp[...,0], num_classes=self.n_classes, dtype=self.variableTypeY)
 
         return X.astype(self.variableTypeX), Y.astype(self.variableTypeY)
 

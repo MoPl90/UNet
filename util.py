@@ -5,10 +5,10 @@ import matplotlib
 import matplotlib.pyplot as plt
 import random
 
-from keras import backend as K
+from tensorflow.keras import backend as K
 
-from keras.utils import plot_model
-from keras.preprocessing.image import (load_img, img_to_array)
+from tensorflow.keras.utils import plot_model
+from tensorflow.keras.preprocessing.image import (load_img, img_to_array)
 from scipy.ndimage.interpolation import map_coordinates
 from scipy.ndimage.filters import gaussian_filter
 import cv2
@@ -629,30 +629,33 @@ def CTNormalization(array):
     return np.clip(array, 0.001, 100)
     
 #1909.02642
-def intensityNormalization(img, N=50):
+def intensityNormalization(img, N=50, augment=True):
 
-
-    aug = np.clip(img, 30, np.percentile(img, 99.5)) = 30
+    #normalize
+    aug = np.clip(img, 30, np.percentile(img, 99.5)).astype(int) - 30
     
-    random = np.random.uniform(np.min(aug), (np.max(aug)), size=(N + int(np.max(aug))))
-    
-    #moving average
-    random = np.convolve(random, np.ones((N,))/N, mode='same')
-    random = random[N//2:-N//2]
-
-    #linear component
-    lin = np.arange(int(np.max(aug)))
-    sgn = np.random.uniform(-1,1)
-    lin =  0.5 * sgn * (lin - lin[-1]/2)
-    
-    #add components and rescale
-    prox = random + lin
-    prox = np.max(aug) * (prox - np.min(prox)) / (np.max(prox) - np.min(prox))
-    
-    #augmentation
-    for i, val in enumerate(np.arange(np.max(aug))):
-        aug[aug == val] = prox[i]
+    #augment
+    if augment:
+        random = np.random.uniform(np.min(aug), (np.max(aug)), size=(N + int(np.max(aug))))
         
+        #moving average
+        random = np.convolve(random, np.ones((N,))/N, mode='same')
+        random = random[N//2:-N//2]
+
+        #linear component
+        lin = np.arange(int(np.max(aug)))
+        sgn = np.random.uniform(-1,1)
+        lin =  0.5 * sgn * (lin - lin[-1]/2)
+        
+        #add components and rescale
+        prox = random + lin
+        prox = np.max(aug) * (prox - np.min(prox)) / (np.max(prox) - np.min(prox))
+        
+        #augmentation
+        for i, val in enumerate(np.arange(np.max(aug))):
+            aug[aug == val] = prox[i]
+    
+    #rescale to [-1,1] 
     aug = -1 + 2 * (aug - np.min(aug)) / (np.max(aug) - np.min(aug)) 
 
     return aug

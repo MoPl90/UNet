@@ -1,28 +1,28 @@
-from keras import backend as K
+from tensorflow.keras import backend as K
 
-from keras.layers.core import Lambda
+from tensorflow.keras.layers import Lambda
 
-from keras.layers import Activation
-from keras.layers import Add
-from keras.layers import BatchNormalization
-from keras.layers import Concatenate
-from keras.layers import Conv2D
-from keras.layers import Conv2DTranspose
-from keras.layers import Cropping2D
-from keras.layers import Dense
-from keras.layers import Dropout
-from keras.layers import GlobalAveragePooling2D
-from keras.layers import MaxPooling2D
-from keras.layers import Multiply
-from keras.layers import Reshape
+from tensorflow.keras.layers import Activation
+from tensorflow.keras.layers import Add
+from tensorflow.keras.layers import BatchNormalization
+from tensorflow.keras.layers import Concatenate
+from tensorflow.keras.layers import Conv2D
+from tensorflow.keras.layers import Conv2DTranspose
+from tensorflow.keras.layers import Cropping2D
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import Dropout
+from tensorflow.keras.layers import GlobalAveragePooling2D
+from tensorflow.keras.layers import MaxPooling2D
+from tensorflow.keras.layers import Multiply
+from tensorflow.keras.layers import Reshape
 
-from keras.layers import Conv3D
-from keras.layers import Conv3DTranspose
-from keras.layers import Cropping3D
-from keras.layers import GlobalAveragePooling3D
-from keras.layers import MaxPooling3D
+from tensorflow.keras.layers import Conv3D
+from tensorflow.keras.layers import Conv3DTranspose
+from tensorflow.keras.layers import Cropping3D
+from tensorflow.keras.layers import GlobalAveragePooling3D
+from tensorflow.keras.layers import MaxPooling3D
 
-from keras.regularizers import l2
+from tensorflow.keras.regularizers import l2
 
 from util import _get_dim_ordering, _get_channel_axis, _get_strides_factor, _get_tensor_shape
 

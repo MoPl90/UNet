@@ -9,16 +9,16 @@ import nibabel as nib
 import numpy as np
 
 from metric import *
-from keras.optimizers import *
-from keras import backend as K
+from tensorflow.keras.optimizers import *
+from tensorflow.keras import backend as K
 
 from loss import *
-from keras.losses import categorical_crossentropy
+from tensorflow.keras.losses import categorical_crossentropy
 from shutil import copyfile
 
 from util import generatePartitionTrainAndValidFromFolderRandomly
 from data_generator import DataGenerator
-from keras.callbacks import *
+from tensorflow.keras.callbacks import *
 from unet_3D import UNet_3D
 
 def determine_weights_from_segmentation_mask(mp):
@@ -173,9 +173,8 @@ def create_loss_func(mp):
 
     if loss_name == 'dice_multi_class_nb_plus_weighted_xentropy':
         def lossfunc(y_true, y_pred, weights):
-
+            
             def weighted_categorical_crossentropy(y_true, y_pred, weights=weights):
-                weights = K.variable(weights)
                 y_pred /= K.clip(y_pred, K.epsilon(), 1 - K.epsilon())
                 loss = y_true * K.log(y_pred + K.epsilon()) * weights
                 loss = -K.sum(loss, -1)
@@ -271,7 +270,7 @@ if __name__ == "__main__":
     callbacks = create_callbacks(cb_param, log_path)
     
     # Fit model.
-    results = model.fit_generator(generator=training_generator, validation_data=validation_generator, use_multiprocessing=False, epochs=mp['epochs'], callbacks=callbacks)
+    results = model.fit(x=training_generator, validation_data=validation_generator, use_multiprocessing=False, epochs=mp['epochs'], callbacks=callbacks)
     
     # Store model.
     model.save(model_path)
