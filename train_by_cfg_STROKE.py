@@ -101,7 +101,7 @@ def create_callbacks(cb_param, log_path):
 
     callbacks.append(csv_log_cback)
 
-    modelcheck = ModelCheckpoint(filepath=model_path + 'model.{epoch:02d}-{val_loss:.2f}.h5')
+    modelcheck = ModelCheckpoint(filepath=model_path + 'model.{epoch:02d}-{val_loss:.2f}.h5', save_best_only = True)
     callbacks.append(modelcheck)
     
     # logdir = log_path + "scalars/"

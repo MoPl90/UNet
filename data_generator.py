@@ -7,7 +7,7 @@ import glob
 from PIL import Image
 from augmentation import augmentor
 import random
-from util import simpleNormalization, addNoise
+from util import simpleNormalization, addNoise, intensityNormalization
 import datetime
 import os
 import matplotlib.pyplot as plt
@@ -133,6 +133,10 @@ class DataGenerator(keras.utils.Sequence):
             # simpleNormalization
             if (self.normalization_args['simpleNormalize'] == 1):
                 X_temp = simpleNormalization(X_temp)
+
+            # The intensity augmentation can only be used WITHOUt prior rescaling to [0,1] of [-1,1]!
+            elif (self.normalization_args['intensityNormalize'] == 1):
+                X_temp = intensityNormalization(X_temp)
 
             # CTNormalization
             if (self.normalization_args['ctNormalize'] == 1):

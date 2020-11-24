@@ -628,6 +628,36 @@ def simpleNormalization(array):
 def CTNormalization(array):
     return np.clip(array, 0.001, 100)
     
+#1909.02642
+def intensityNormalization(img, N=50):
+
+
+    aug = np.clip(img, 30, np.percentile(img, 99.5)) = 30
+    
+    random = np.random.uniform(np.min(aug), (np.max(aug)), size=(N + int(np.max(aug))))
+    
+    #moving average
+    random = np.convolve(random, np.ones((N,))/N, mode='same')
+    random = random[N//2:-N//2]
+
+    #linear component
+    lin = np.arange(int(np.max(aug)))
+    sgn = np.random.uniform(-1,1)
+    lin =  0.5 * sgn * (lin - lin[-1]/2)
+    
+    #add components and rescale
+    prox = random + lin
+    prox = np.max(aug) * (prox - np.min(prox)) / (np.max(prox) - np.min(prox))
+    
+    #augmentation
+    for i, val in enumerate(np.arange(np.max(aug))):
+        aug[aug == val] = prox[i]
+        
+    aug = -1 + 2 * (aug - np.min(aug)) / (np.max(aug) - np.min(aug)) 
+
+    return aug
+
+    
 def mosaic(Image3D,numberOfRows=5):
 
     numberOfImages = Image3D.shape[2]
