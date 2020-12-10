@@ -51,7 +51,7 @@ def jaccard_loss(y_true, y_pred, weights=[0.1, 0.9]):
 
 def categorical_xentropy_loss(y_true, y_pred, weights=[0.1, 0.9], epsilon=1e-8):
     print('categorical xentropy loss')
-    print(weights)
+
     ndim = K.ndim(y_pred)
     ncategory = K.int_shape(y_pred)[-1]
     # scale predictions so class probabilities of each pixel sum to 1

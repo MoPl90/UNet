@@ -7,16 +7,40 @@ import glob
 from PIL import Image
 from augmentation import augmentor
 import random
-from util import simpleNormalization, addNoise, intensityNormalization
+from util import simpleNormalization, addNoise, intensityNormalization, CTNormalization
 import datetime
 import os
 import matplotlib.pyplot as plt
 import nibabel as nib
 from tensorflow.keras.utils import to_categorical, Sequence
+from skimage.transform import resize
 
 class DataGenerator(Sequence):
 
-    def __init__(self, list_IDs, imagePathFolder, labelPathFolder, normalization_args, augment, augmentation_args, preload_data = False, imageType = '.dcm', labelType = '.dcm', batch_size=32, dim=(32, 32, 32), crop_parameters=[0,10,0,10,0,10], n_channels=1, n_classes=10, shuffle=True, variableTypeX = 'float32', variableTypeY = 'float32', savePath = None, preload=False, spade_norm=False, lr_seg=False, **kwargs):
+    def __init__(self, 
+                 list_IDs, 
+                 imagePathFolder, 
+                 labelPathFolder, 
+                 normalization_args, 
+                 augment, 
+                 augmentation_args, 
+                 preload_data = False, 
+                 imageType = '.dcm', 
+                 labelType = '.dcm', 
+                 batch_size=32, 
+                 dim=(32, 32, 32), 
+                 crop_parameters=[0,10,0,10,0,10], 
+                 resize_parameters=None,
+                 n_channels=1, 
+                 n_classes=10, 
+                 shuffle=True, 
+                 variableTypeX = 'float32', 
+                 variableTypeY = 'float32', 
+                 savePath = None, 
+                 preload=False, 
+                 spade_norm=False, 
+                 lr_seg=False, 
+                 **kwargs):
 
         self.dim = dim
         self.batch_size = batch_size
@@ -32,6 +56,7 @@ class DataGenerator(Sequence):
         self.variableTypeX = variableTypeX
         self.variableTypeY = variableTypeY
         self.crop_parameters = crop_parameters
+        self.resize_parameters = resize_parameters
 
         self.augment = augment
         self.augmentation_args = augmentation_args
@@ -42,8 +67,8 @@ class DataGenerator(Sequence):
         #preload data into RAM if stated
         self.preload = preload_data
         if self.preload:
-            self.dataX = self._preloadData(list_IDs, self.imagePathFolder, self.crop_parameters, self.imageType)
-            self.dataY = self._preloadData(list_IDs, self.labelPathFolder, self.crop_parameters, self.labelType, labels=True)
+            self.dataX = self._preloadData(list_IDs, self.imagePathFolder, self.imageType)
+            self.dataY = self._preloadData(list_IDs, self.labelPathFolder, self.labelType)
 
         #create augmentor
         augmentation_parameters = {
@@ -69,14 +94,14 @@ class DataGenerator(Sequence):
         self.on_epoch_end()
 
 
-    def _preloadData(self, IDs, folderPath, crop_params, imgType, labels=False):
+    def _preloadData(self, IDs, folderPath, imgType):
         # X: we need to add a new axis for the channel dimension
         # Y: we need to transform to categorical
         #generate dict with sample-ID as key and dataobj as value
         dataDict = {}
         for i, ID in enumerate(IDs):
             #load data
-            dataObj = self.load3DImagesNii(folderPath, ID, imgType, crop_params)[..., np.newaxis]
+            dataObj = self.load3DImagesNii(folderPath, ID, imgType, self.crop_parameters, self.resize_parameters)[..., np.newaxis]
 
             #add new key-value pair
             dataDict[ID] = dataObj
@@ -99,8 +124,8 @@ class DataGenerator(Sequence):
 
         #Load data at this point if not preloaded already
         if not self.preload:
-            self.dataX = self._preloadData(list_IDs_temp, self.imagePathFolder, self.crop_parameters, self.imageType)
-            self.dataY = self._preloadData(list_IDs_temp, self.labelPathFolder, self.crop_parameters, self.labelType, labels=True)
+            self.dataX = self._preloadData(list_IDs_temp, self.imagePathFolder, self.imageType)
+            self.dataY = self._preloadData(list_IDs_temp, self.labelPathFolder, self.labelType)
 
         #Generate data
         X = np.empty((self.batch_size, *self.dim, self.n_channels))
@@ -124,13 +149,7 @@ class DataGenerator(Sequence):
             # normalization
             if (self.normalization_args['normalize'] == 1):
                 X_temp = normalize(X_temp, self.normalization_args['normalization_threshold'])
-            """
-            if (self.normalization_args['histogramNormalize'] == 1):
-                X_temp = histogramNormalize(X_temp, self.normalization_args['histogramNormalize_underThreshold'], self.normalization_args['histogramNormalize_strokeThreshold'], self.normalization_args['histogramNormalize_upperThreshold'])
 
-                if (self.normalization_args['removeSignalunderRelativeThreshold']):
-                    X_temp = removeSignalunderRelativeThreshold(X_temp, self.normalization_args['removeSignalunderRelativeThreshold_cutOff'])
-            """
             # simpleNormalization
             if (self.normalization_args['simpleNormalize'] == 1):
                 X_temp = simpleNormalization(X_temp)
@@ -141,6 +160,7 @@ class DataGenerator(Sequence):
 
             # CTNormalization
             if (self.normalization_args['ctNormalize'] == 1):
+
                 X_temp = CTNormalization(X_temp)
 
             # gaussian filter
@@ -154,7 +174,7 @@ class DataGenerator(Sequence):
 
         return X.astype(self.variableTypeX), Y.astype(self.variableTypeY)
 
-    def __len__(self):
+    def __len__(self):  
         return int(np.floor(len(self.list_IDs) / self.batch_size))
 
 
@@ -168,7 +188,11 @@ class DataGenerator(Sequence):
 
         return X, Y
 
-    def load3DImagesNii(self, pathToNiiFolder, caseNumber, imageType, crop_parameters):
+    def load3DImagesNii(self, pathToNiiFolder, caseNumber, imageType, crop_parameters, resize_parameters=None):
         pathToNiiGz = pathToNiiFolder + '/' + caseNumber + imageType
         image_array = np.asanyarray(nib.load(pathToNiiGz).dataobj)
+
+        if resize_parameters is not None:
+            image_array = resize(image_array, resize_parameters)
+
         return image_array[crop_parameters[0]: crop_parameters[1], crop_parameters[2]: crop_parameters[3], crop_parameters[4]: crop_parameters[5]]

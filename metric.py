@@ -14,7 +14,8 @@ def dice_coef(y_true, y_pred, axis=(1, 2, 3), epsilon=1e-6):
     return K.mean((2.0 * intersection + epsilon) / (summation + epsilon), axis=0)
 
 def dice_coef_multi_class(y_true, y_pred, axis=(1, 2, 3), epsilon=1e-6):
-
+    y_true = K.cast(y_true, 'float32')
+    y_pred = K.cast(y_pred, 'float32')
 
     intersection = K.sum(y_true * y_pred, axis=axis)
     area_true = K.sum(y_true, axis=axis)
@@ -42,6 +43,17 @@ def euclidean_distance_loss_binary(result, reference):
 
 # Dice coefficients for the VCGM scheme.
 
+def dice_general():
+    def func(y_true, y_pred):
+        return dice_coef_multi_class(y_true, y_pred)
+    return func
+
+def dice_coef_label(index):
+    def func(y_true, y_pred):
+        return dice_coef_multi_class(y_true[:, :, :, :, index], y_pred[:, :, :, :, index])
+    func.__name__ = "dice_coef_" + str(index)
+    return func
+    
 def dice_coef_background(y_true, y_pred):
     return dice_coef_multi_class(y_true[:, :, :, :, 0], y_pred[:, :, :,  :, 0])
 

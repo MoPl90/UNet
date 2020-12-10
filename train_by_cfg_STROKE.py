@@ -18,6 +18,7 @@ from shutil import copyfile
 
 from util import generatePartitionTrainAndValidFromFolderRandomly
 from data_generator import DataGenerator
+from data_generator_multi_thread import DataGenerator_MT
 from tensorflow.keras.callbacks import *
 from unet_3D import UNet_3D
 
@@ -33,7 +34,7 @@ def determine_weights_from_segmentation_mask(mp):
         S += weights[idx]
     weights = S/weights
     weights = weights / np.sum(weights)
-    print(weights)
+
     return weights
 
 def collect_parameters(cp, section):
@@ -55,55 +56,78 @@ def collect_parameters(cp, section):
 
 #Make this more general
 def assemble_additional_parameters(mp, gen_param):
+    if not 'resize_parameters' in mp:
+        mp['resize_parameters'] = None
+
     params = {'dim': (mp['x_end']-mp['x_start'], mp['y_end']-mp['y_start'], mp['z_end']-mp['z_start']),
               'crop_parameters': [mp['x_start'], mp['x_end'], mp['y_start'], mp['y_end'], mp['z_start'], mp['z_end']],
+              'resize_parameters': mp['resize_parameters'],
               'batch_size': mp['batchsize'],
               'n_classes': mp['labels'],
               'n_channels': mp['channels'],
-              'imageType': gen_param['imgType'],
-              'labelType': gen_param['labelType'],
-              'variableType': gen_param['variableType'],
+              'imageType': mp['imgType'],
+              'labelType': mp['labelType'],
+              'variableTypeX': gen_param['variableTypeX'],
+              'variableTypeY': gen_param['variableTypeY'],
               'loss_weights': [gen_param['lossWeightsLower'], gen_param['lossWeightsUpper']]}
     return params
-    
-def create_data_storage(mp, config, train):
-    
-    model_path  = os.path.join(mp['savmodpath'] + time.strftime("%Y%m%d_%H%M%S")  + '_' + 'Dropout' + str(train) + '_'  + mp['comment'] + '/model.h5')
-    
+
+def verify_parameters(mp):
+    # Check if the dimension of the input volume.
+    dims = mp['x_end']-mp['x_start'], mp['y_end']-mp['y_start'], mp['z_end']-mp['z_start']
+
+    assert np.sum(np.mod(dims, 2**mp['depth']))==0, "All input dimensions have to be divisible by 2**Depth."
+
+
+def create_data_storage(mp, config, partition, train, out_folder):
+
+    if out_folder=='':
+        model_path = os.path.join(mp['savmodpath'] + time.strftime("%Y%m%d_%H%M%S")  + '_' + 'Dropout' + str(train) + '_'  + mp['comment'] + '/model.h5')
+    else:
+        model_path = out_folder
     save_path   = os.path.dirname(model_path)
     log_path    = save_path + '/logs'
-    
-    if os.path.exists(save_path) is False:
+    script_path = save_path + '/scripts'
+
+    if not os.path.exists(save_path):
         os.mkdir(save_path)
         os.mkdir(log_path)
-    
+        os.mkdir(script_path)
+
     current_dir = os.path.dirname(os.path.realpath("__file__"))
     copyfile(current_dir + '/' + config, save_path + '/'  + config.split('/')[-1])
-    
-    # # Save the validation partition cases.
-    # f = open(save_path+'/validation_partition.txt',"w")
-    # for p in partition['validation']:
-    #     f.write(p + '\n')
-    # f.close()
-    
+
+    # Save the validation partition cases.
+    f = open(save_path+'/validation_partition.txt',"w")
+    for p in partition['validation']:
+        f.write(p + '\n')
+    f.close()
+
+    # Save the used train-/unet_3D- and operations.py files
+    try:
+        os.system("cp {} {}".format(sys.argv[0], os.path.join(script_path, sys.argv[0])))
+        os.system("cp {} {}".format('unet_3D.py', os.path.join(script_path, 'unet_3D.py')))
+        os.system("cp {} {}".format('operations.py', os.path.join(script_path, 'operations.py')))
+    except:
+        pass
+
     return save_path, log_path, model_path
 
-def create_callbacks(cb_param, log_path):
+
+def create_callbacks(cb_param, save_path, log_path):
     callbacks = []
-    
+
     if cb_param['earlyStop']:
         earlystopper = EarlyStopping(monitor='val_loss', patience=cb_param['earlyStopPatience'], verbose=1, mode='auto')
-
-    callbacks.append(earlystopper)
+        callbacks.append(earlystopper)
 
     if cb_param['historyLog']:
         csv_log_cback = CSVLogger('{}/historyLog.csv'.format(log_path))
+        callbacks.append(csv_log_cback)
 
-    callbacks.append(csv_log_cback)
-
-    modelcheck = ModelCheckpoint(filepath=model_path + 'model.{epoch:02d}-{val_loss:.2f}.h5', save_best_only = True)
+    modelcheck = ModelCheckpoint(filepath = os.path.join(save_path, 'model_{val_loss:.2f}_{epoch:02d}.h5'), save_best_only = True)
     callbacks.append(modelcheck)
-    
+
     # logdir = log_path + "scalars/"
     # tensorboard_callback = TensorBoard(log_dir=logdir)
     # print('Tensorboard Dir: ' + logdir)
@@ -175,6 +199,9 @@ def create_loss_func(mp):
         def lossfunc(y_true, y_pred, weights):
             
             def weighted_categorical_crossentropy(y_true, y_pred, weights=weights):
+                y_true = K.cast(y_true, 'float32')
+                y_pred = K.cast(y_pred, 'float32')
+
                 y_pred /= K.clip(y_pred, K.epsilon(), 1 - K.epsilon())
                 loss = y_true * K.log(y_pred + K.epsilon()) * weights
                 loss = -K.sum(loss, -1)
@@ -204,15 +231,8 @@ def print_report(cp):
                 print((e + ': ' + p[sec][e]))
     print(''.rjust(80, '-'))
 
-if __name__ == "__main__":
-    
-    # Parse input arguments of the train method.
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-c", "--config", help="Config file for training function.", default="", type=str)
-    parser.add_argument("-g", "--gpu", help="Select gpu (0,1,2,3,4 on giggs).", default='0', type=str)
-    parser.add_argument("-t", "--train", help="Set dropout layers active during prediction, for MC estimates.", default='0', type=str) 
-    args = parser.parse_args()
-    
+
+def run_training(args):
     if args.train=='1':
         train=True
     else:
@@ -222,55 +242,167 @@ if __name__ == "__main__":
     p = configparser.ConfigParser()
     p.optionxform = str
     p.read(args.config)
-    
+
     # Collect main, data generation, normalization, image, augmentation and callback settings.
     mp         = collect_parameters(p, 'MAIN')
     gen_param  = collect_parameters(p, 'GEN')
-    val_param  = collect_parameters(p, 'VAL')
     norm_param = collect_parameters(p, 'NORM')
     aug_param  = collect_parameters(p, 'AUG')
     cb_param   = collect_parameters(p, 'CALLBACK')
 
-    misc_param_gen = assemble_additional_parameters(mp, gen_param)
-    misc_param_val = assemble_additional_parameters(mp, val_param)
+    misc_param = assemble_additional_parameters(mp, gen_param)
 
-    # Set up graphics card settings.
+    # Verify parameters.
+    verify_parameters(mp)
+
     os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
-    
+
     # Generate training/test partition.
-    train_ids = generatePartitionTrainAndValidFromFolderRandomly(gen_param['imgPath'], gen_param['validprop'], gen_param['shuffletrain'], gen_param['imgType'], gen_param['labelPath'], gen_param["labelType"], threshold=gen_param["thresh"])
-    test_ids = generatePartitionTrainAndValidFromFolderRandomly(val_param['imgPath'], val_param['validprop'], val_param['shuffletrain'], val_param['imgType'], val_param['labelPath'], val_param["labelType"], threshold=val_param["thresh"])
+    if mp['trnImgPath'] == mp['valImgPath']:
+        partition = generatePartitionTrainAndValidFromFolderRandomly(mp['trnImgPath'], gen_param['validprop'], gen_param['shuffletrain'], mp['imgType'], mp['trnLabelPath'], mp['labelType'], gen_param['trnThreshold'])
+        print('No separate valImgPath stated -> splitted data into train and validation partition')
+    else:
+        partition = generatePartitionTrainAndValidFromFolderRandomly(mp['trnImgPath'], 0.0, gen_param['shuffletrain'], mp['imgType'], mp['trnLabelPath'], mp['labelType'], gen_param['trnThreshold'])
+        partition['validation'] = generatePartitionTrainAndValidFromFolderRandomly(mp['valImgPath'], 0.0, gen_param['shuffletrain'], mp['imgType'], mp['valLabelPath'], mp['labelType'], gen_param['valThreshold'])['train']
+
+
+    # Generate data storage folders.
+    save_path, log_path, model_path = create_data_storage(mp, args.config, partition, train, args.out)
+    misc_param['savePath'] = save_path
 
     # Generate data generator objects.
-    training_generator   = DataGenerator(train_ids['train'], gen_param['imgPath'], gen_param['labelPath'], norm_param, gen_param["augment"], aug_param, **misc_param_gen)
-    validation_generator = DataGenerator(test_ids['validation'], val_param['imgPath'], val_param['labelPath'], norm_param, val_param["augment"], aug_param, **misc_param_val)
-    
+    if args.multi_threaded=='0':
+        training_generator   = DataGenerator(partition['train'], mp['trnImgPath'], mp['trnLabelPath'], norm_param, mp['augment'], aug_param, **misc_param)
+        validation_generator = DataGenerator(partition['validation'], mp['valImgPath'], mp['valLabelPath'], norm_param, mp['augmentval'], aug_param, **misc_param)
+    elif args.multi_threaded=='1':
+        training_generator   = DataGenerator_MT(mp['epochs'], partition['train'], mp['trnImgPath'], mp['trnLabelPath'], norm_param, mp['augment'], aug_param, **misc_param)
+        validation_generator = DataGenerator_MT(mp['epochs'], partition['validation'], mp['valImgPath'], mp['valLabelPath'], norm_param, mp['augmentval'], aug_param, **misc_param)
+
+
     # Generate the model.
     n_rows, n_cols, n_slices = mp['x_end']-mp['x_start'], mp['y_end']-mp['y_start'], mp['z_end']-mp['z_start']
-    model = UNet_3D(input_shape=(n_rows, n_cols, n_slices, mp['channels']), nb_labels=mp['labels'], filters=mp['features'], depth=mp['depth'], nb_bottleneck=mp['bneck'], activation=mp['activation'], activation_network=mp['outact'], 
-                    batch_norm=mp['batchnorm'], dropout_encoder=mp['dropout_en'], dropout_decoder=mp['dropout_de'], use_preact=False, use_mvn=False, train=train).create_model()
-    model.summary()
+
+    model = UNet_3D(input_shape=(n_rows, n_cols, n_slices, mp['channels']), nb_labels=mp['labels'],
+                    depth=mp['depth'], nb_bottleneck=mp['bneck'], filters=mp['features'], activation=mp['activation'], activation_network=mp['outact'],
+                    dropout_encoder=mp['dropout_en'], dropout_decoder=mp['dropout_de'], train=train).create_model()
 
     # Set up  metrics.
-    metrics = [dice_coef_background, dice_coef_first_label]
+    metrics = []
+    for i in range(int(mp['labels'])):
+        metrics.append(dice_coef_label(i))
+
     # Set up loss function
     lossfunc = create_loss_func(mp)
-    opt = Adam(lr=mp["learningrate"])
+
+    # Set up optimizer
+    if mp['optimizer'].lower() in ['radam', 'ranger']:
+        tot_update_steps = mp['epochs'] * len(partition['train'])
+        opt = RectifiedAdam(learning_rate = mp['lr'],
+                            total_steps = tot_update_steps,
+                            warmup_proportion = 0.1,
+                            min_lr = mp['lr'])
+        if mp['optimizer'].lower() == 'ranger':
+            opt = Lookahead(opt, sync_period=6, slow_step_size=0.5)
+
+    elif mp['optimizer'].lower() == 'nadam':
+        opt = Nadam(learning_rate = mp['lr'])
+
+    elif mp['optimizer'].lower() == 'adam':
+        opt = Adam(learning_rate = mp['lr'])
+
+    elif mp['optimizer'].lower() == 'sgd':
+        opt = SGD(learning_rate = mp['lr'])
+
+    else:
+        print('Invalid optimizer selection "{}" (may be not implemented)'.format(mp['optimizer']))
+        exit()
+
+    # Compile model
     model.compile(optimizer=opt, loss=lossfunc, metrics=metrics)
-    
-    # Print report prior to fit of the model.
-    print_report(p)
-    
-    # Generate data storage folders.
-    save_path, log_path, model_path = create_data_storage(mp, args.config, train)
-    
+
     # Generate callback settings.
-    callbacks = create_callbacks(cb_param, log_path)
-    
-    # Fit model.
-    results = model.fit(x=training_generator, validation_data=validation_generator, use_multiprocessing=False, epochs=mp['epochs'], callbacks=callbacks)
-    
+    callbacks = create_callbacks(cb_param, save_path, log_path)
+
+    # Fit model (multiprocessing = False because of warnings)
+    results = model.fit(x=training_generator, validation_data=validation_generator, use_multiprocessing=False, epochs=mp['epochs'], callbacks=callbacks, shuffle=False, verbose=1)
+
     # Store model.
     model.save(model_path)
+
+if __name__ == "__main__":
+    
+    # Parse input arguments of the train method.
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-c", "--config", help="Config file for training function.", default="", type=str)
+    parser.add_argument("-g", "--gpu", help="Select gpu (0,1,2,3,4 on giggs).", default='0', type=str)
+    parser.add_argument("-t", "--train", help="Set dropout layers active during prediction, for MC estimates.", default='0', type=str) 
+    parser.add_argument("-o", "--out", help="Output path for model etc..", default='', type=str)
+    parser.add_argument("-m", "--multi_threaded", help="Multi-threaded data generator.", default=0)
+    
+    args = parser.parse_args()
+    
+    run_training(args)
+
+    # if args.train=='1':
+    #     train=True
+    # else:
+    #     train=False
+
+    # # Load config file.
+    # p = configparser.ConfigParser()
+    # p.optionxform = str
+    # p.read(args.config)
+    
+    # # Collect main, data generation, normalization, image, augmentation and callback settings.
+    # mp         = collect_parameters(p, 'MAIN')
+    # gen_param  = collect_parameters(p, 'GEN')
+    # val_param  = collect_parameters(p, 'VAL')
+    # norm_param = collect_parameters(p, 'NORM')
+    # aug_param  = collect_parameters(p, 'AUG')
+    # cb_param   = collect_parameters(p, 'CALLBACK')
+
+    # misc_param_gen = assemble_additional_parameters(mp, gen_param)
+    # misc_param_val = assemble_additional_parameters(mp, val_param)
+
+    # # Set up graphics card settings.
+    # os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
+    # os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+    # os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
+    
+    # # Generate training/test partition.
+    # train_ids = generatePartitionTrainAndValidFromFolderRandomly(gen_param['imgPath'], gen_param['validprop'], gen_param['shuffletrain'], gen_param['imgType'], gen_param['labelPath'], gen_param["labelType"], threshold=gen_param["thresh"])
+    # test_ids = generatePartitionTrainAndValidFromFolderRandomly(val_param['imgPath'], val_param['validprop'], val_param['shuffletrain'], val_param['imgType'], val_param['labelPath'], val_param["labelType"], threshold=val_param["thresh"])
+
+    # # Generate data generator objects.
+    # training_generator   = DataGenerator(train_ids['train'], gen_param['imgPath'], gen_param['labelPath'], norm_param, gen_param["augment"], aug_param, **misc_param_gen)
+    # validation_generator = DataGenerator(test_ids['validation'], val_param['imgPath'], val_param['labelPath'], norm_param, val_param["augment"], aug_param, **misc_param_val)
+    
+    # # Generate the model.
+    # n_rows, n_cols, n_slices = mp['x_end']-mp['x_start'], mp['y_end']-mp['y_start'], mp['z_end']-mp['z_start']
+    # model = UNet_3D(input_shape=(n_rows, n_cols, n_slices, mp['channels']), nb_labels=mp['labels'], filters=mp['features'], depth=mp['depth'], nb_bottleneck=mp['bneck'], activation=mp['activation'], activation_network=mp['outact'], 
+    #                 batch_norm=mp['batchnorm'], dropout_encoder=mp['dropout_en'], dropout_decoder=mp['dropout_de'], use_preact=False, use_mvn=False, train=train).create_model()
+    # model.summary()
+
+    # # Set up  metrics.
+    # metrics = [dice_coef_background, dice_coef_first_label]
+    # # Set up loss function
+    # lossfunc = create_loss_func(mp)
+    # opt = Adam(lr=mp["learningrate"])
+    # model.compile(optimizer=opt, loss=lossfunc, metrics=metrics)
+    
+    # # Print report prior to fit of the model.
+    # print_report(p)
+    
+    # # Generate data storage folders.
+    # save_path, log_path, model_path = create_data_storage(mp, args.config, train)
+    
+    # # Generate callback settings.
+    # callbacks = create_callbacks(cb_param, log_path)
+    
+    # # Fit model.
+    # results = model.fit(x=training_generator, validation_data=validation_generator, use_multiprocessing=False, epochs=mp['epochs'], callbacks=callbacks)
+    
+    # # Store model.
+    # model.save(model_path)

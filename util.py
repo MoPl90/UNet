@@ -626,8 +626,14 @@ def simpleNormalization(array):
     return vol
 
 def CTNormalization(array):
-    return np.clip(array, 0.001, 100)
+    vol = np.clip(array, 0.001, 100)
     
+    # vol -= np.mean(vol)
+    # vol /= np.std(vol)
+    vol = -1 + 2 * (vol - np.min(vol)) / (np.max(vol) - np.min(vol))
+
+    return vol
+
 #1909.02642
 def intensityNormalization(img, N=50, augment=True):
 
