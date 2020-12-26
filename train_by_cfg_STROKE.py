@@ -339,70 +339,8 @@ if __name__ == "__main__":
     parser.add_argument("-g", "--gpu", help="Select gpu (0,1,2,3,4 on giggs).", default='0', type=str)
     parser.add_argument("-t", "--train", help="Set dropout layers active during prediction, for MC estimates.", default='0', type=str) 
     parser.add_argument("-o", "--out", help="Output path for model etc..", default='', type=str)
-    parser.add_argument("-m", "--multi_threaded", help="Multi-threaded data generator.", default=0)
+    parser.add_argument("-m", "--multi_threaded", help="Multi-threaded data generator.", default='0')
     
     args = parser.parse_args()
     
     run_training(args)
-
-    # if args.train=='1':
-    #     train=True
-    # else:
-    #     train=False
-
-    # # Load config file.
-    # p = configparser.ConfigParser()
-    # p.optionxform = str
-    # p.read(args.config)
-    
-    # # Collect main, data generation, normalization, image, augmentation and callback settings.
-    # mp         = collect_parameters(p, 'MAIN')
-    # gen_param  = collect_parameters(p, 'GEN')
-    # val_param  = collect_parameters(p, 'VAL')
-    # norm_param = collect_parameters(p, 'NORM')
-    # aug_param  = collect_parameters(p, 'AUG')
-    # cb_param   = collect_parameters(p, 'CALLBACK')
-
-    # misc_param_gen = assemble_additional_parameters(mp, gen_param)
-    # misc_param_val = assemble_additional_parameters(mp, val_param)
-
-    # # Set up graphics card settings.
-    # os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
-    # os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-    # os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
-    
-    # # Generate training/test partition.
-    # train_ids = generatePartitionTrainAndValidFromFolderRandomly(gen_param['imgPath'], gen_param['validprop'], gen_param['shuffletrain'], gen_param['imgType'], gen_param['labelPath'], gen_param["labelType"], threshold=gen_param["thresh"])
-    # test_ids = generatePartitionTrainAndValidFromFolderRandomly(val_param['imgPath'], val_param['validprop'], val_param['shuffletrain'], val_param['imgType'], val_param['labelPath'], val_param["labelType"], threshold=val_param["thresh"])
-
-    # # Generate data generator objects.
-    # training_generator   = DataGenerator(train_ids['train'], gen_param['imgPath'], gen_param['labelPath'], norm_param, gen_param["augment"], aug_param, **misc_param_gen)
-    # validation_generator = DataGenerator(test_ids['validation'], val_param['imgPath'], val_param['labelPath'], norm_param, val_param["augment"], aug_param, **misc_param_val)
-    
-    # # Generate the model.
-    # n_rows, n_cols, n_slices = mp['x_end']-mp['x_start'], mp['y_end']-mp['y_start'], mp['z_end']-mp['z_start']
-    # model = UNet_3D(input_shape=(n_rows, n_cols, n_slices, mp['channels']), nb_labels=mp['labels'], filters=mp['features'], depth=mp['depth'], nb_bottleneck=mp['bneck'], activation=mp['activation'], activation_network=mp['outact'], 
-    #                 batch_norm=mp['batchnorm'], dropout_encoder=mp['dropout_en'], dropout_decoder=mp['dropout_de'], use_preact=False, use_mvn=False, train=train).create_model()
-    # model.summary()
-
-    # # Set up  metrics.
-    # metrics = [dice_coef_background, dice_coef_first_label]
-    # # Set up loss function
-    # lossfunc = create_loss_func(mp)
-    # opt = Adam(lr=mp["learningrate"])
-    # model.compile(optimizer=opt, loss=lossfunc, metrics=metrics)
-    
-    # # Print report prior to fit of the model.
-    # print_report(p)
-    
-    # # Generate data storage folders.
-    # save_path, log_path, model_path = create_data_storage(mp, args.config, train)
-    
-    # # Generate callback settings.
-    # callbacks = create_callbacks(cb_param, log_path)
-    
-    # # Fit model.
-    # results = model.fit(x=training_generator, validation_data=validation_generator, use_multiprocessing=False, epochs=mp['epochs'], callbacks=callbacks)
-    
-    # # Store model.
-    # model.save(model_path)
