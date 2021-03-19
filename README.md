@@ -6,7 +6,7 @@ This Code implements the UNet segmentation network which is widely used in biome
 ## Usage
 To use this code, you have to set up a python enviornment:
 ```
-$ conda create -n yourenv python==3.7
+$ conda create -n yourenv python=3.7
 $ conda activate yourenv
 $ pip install -r requirements.txt
 ```
