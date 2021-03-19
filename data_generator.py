@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import nibabel as nib
 from tensorflow.keras.utils import to_categorical, Sequence
 from skimage.transform import resize
+from util import simpleNormalization, addNoise, intensityNormalization, CTNormalization
 
 class DataGenerator(Sequence):
 
@@ -66,8 +67,8 @@ class DataGenerator(Sequence):
         #preload data into RAM if stated
         self.preload = preload_data
         if self.preload:
-            self.dataX = self.loadData(list_IDs, self.labelPath, order=0)
-            self.dataY = self.loadData(list_IDs, self.imagePath, order=1)
+            self.dataX = self.loadData(list_IDs, self.imagePath, order=1)
+            self.dataY = self.loadData(list_IDs, self.labelPath, order=0)
 
         #create augmentor
         augmentation_parameters = {
@@ -93,14 +94,14 @@ class DataGenerator(Sequence):
         self.on_epoch_end()
 
 
-    def loadData(self, IDs, folderPath, order):
+    def loadData(self, IDs, folderPath, imageType, order):
         # X: we need to add a new axis for the channel dimension
         # Y: we need to transform to categorical
         #generate dict with sample-ID as key and dataobj as value
         dataDict = {}
         for i, ID in enumerate(IDs):
             if '.nii.gz' in self.imageType or '.nii' in self.imageType:
-                dataObj = self.load3DImagesNii(folderPath, ID, self.imageType, self.crop_parameters, self.resize_parameters)[..., np.newaxis]
+                dataObj = self.load3DImagesNii(folderPath, ID, imageType, self.crop_parameters, self.resize_parameters,order=order)[..., np.newaxis]
             elif self.imageType == '.dcm':
                 dataObj = self.load3DImagesDcm(folderPath, ID, self.crop_parameters, self.resize_parameters, order=order)[..., np.newaxis]
             elif self.imageType == '.npy':
@@ -131,8 +132,8 @@ class DataGenerator(Sequence):
 
         #Load data at this point if not preloaded already
         if not self.preload:
-            self.dataX = self.loadData(list_IDs_temp, self.imagePath, order=1)
-            self.dataY = self.loadData(list_IDs_temp, self.labelPath, order=0)
+            self.dataX = self.loadData(list_IDs_temp, self.imagePath, self.imageType, order=1)
+            self.dataY = self.loadData(list_IDs_temp, self.labelPath, self.labelType, order=0)
 
         #Generate data
         X = np.empty((self.batch_size, *self.dim, self.n_channels))
@@ -153,13 +154,13 @@ class DataGenerator(Sequence):
             if (self.normalization_args['addNoise'] == 1):
                 X_temp = addNoise(X_temp, self.normalization_args['normalization_threshold'], self.normalization_args['meanNoiseDistribution'], self.normalization_args['noiseMultiplicationFactor'])
 
+            # The intensity augmentation can only be used WITHOUT prior rescaling to [0,1] of [-1,1]!
+            if (self.normalization_args['intensityNormalize'] == 1):
+                X_temp = intensityNormalization(X_temp, augment=self.augment)
+
             # simpleNormalization
             if (self.normalization_args['simpleNormalize'] == 1):
                 X_temp = simpleNormalization(X_temp)
-
-            # The intensity augmentation can only be used WITHOUt prior rescaling to [0,1] of [-1,1]!
-            elif (self.normalization_args['intensityNormalize'] == 1):
-                X_temp = intensityNormalization(X_temp, augment=self.augment)
 
             # CTNormalization
             if (self.normalization_args['ctNormalize'] == 1):
@@ -204,12 +205,15 @@ class DataGenerator(Sequence):
 
         return data
         
-    def load3DImagesNii(self, pathToNiiFolder, caseNumber, imageType, crop_parameters, resize_parameters=None):
+    def load3DImagesNii(self, pathToNiiFolder, caseNumber, imageType, crop_params, resize_parameters=None, order=None):
         pathToNiiGz = pathToNiiFolder + '/' + caseNumber + imageType
-        image_array = np.asanyarray(nib.load(pathToNiiGz).dataobj)
+        image_array = np.asanyarray(nib.load(pathToNiiGz).dataobj).squeeze()
 
         if resize_parameters is not None:
-            image_array = resize(image_array, resize_parameters)
+            if order == 0:
+                image_array = resize(image_array, resize_parameters, order=order, anti_aliasing=False, preserve_range=True)
+            else:
+                image_array = resize(image_array, resize_parameters, order=order, anti_aliasing=False, preserve_range=True)
 
         if self.pad:
             padding = np.asarray(self.dim) // 2
@@ -218,7 +222,7 @@ class DataGenerator(Sequence):
         else:
             image_array = image_array[crop_params[0]: crop_params[1], crop_params[2]: crop_params[3], crop_params[4]: crop_params[5]]
             
-        return image_array[crop_parameters[0]: crop_parameters[1], crop_parameters[2]: crop_parameters[3], crop_parameters[4]: crop_parameters[5]]
+        return image_array
 
 
     # load the DICOM files from a Folder, and return a 3 dim numpy array in LPS orientation
@@ -289,9 +293,9 @@ class DataGenerator(Sequence):
 
         if resize_parameters is not None:
             if order == 0:
-                image_array = resize(image_array, resize_parameters, order=order, anti_aliasing=False)
+                image_array = resize(image_array, resize_parameters, order=order, anti_aliasing=False, preserve_range=True)
             else:
-                image_array = resize(image_array, resize_parameters, order=order, anti_aliasing=True)
+                image_array = resize(image_array, resize_parameters, order=order, anti_aliasing=True, preserve_range=True)
 
         if self.pad:
             padding = np.asarray(self.dim) // 2
@@ -371,33 +375,6 @@ def get_id_lists(imagePathFolder, _validProportion, shuffle_train_val, image_typ
 
     return partition
 
-    
-def simpleNormalization(array):
-    vol = array
-
-    if np.amax(vol) > 255:
-        vol[vol < 30] = 0
-    else:
-        vol -= np.max(vol[0:20,:,-1])
-
-    vol = np.clip(vol,0,np.percentile(vol[35:100, 35:100, 6:32],99.5))
-    # vol /= np.max(vol)
-
-    vol -= np.mean(vol)
-    vol /= np.std(vol)
-    vol = -1 + 2 * (vol - np.min(vol)) / (np.max(vol) - np.min(vol))
-
-    return vol
-
-def CTNormalization(array):
-    
-    vol = np.clip(array, 0.001, 100)
-
-    vol -= np.mean(vol)
-    vol /= np.std(vol)
-    vol = -1 + 2 * (vol - np.min(vol)) / (np.max(vol) - np.min(vol))
-
-    return vol
 
 
 def get_orientation(dcm_path):

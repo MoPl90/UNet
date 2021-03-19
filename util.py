@@ -610,14 +610,23 @@ def removeSignalunderRelativeThreshold(X, relativeThreshold):
 
 def simpleNormalization(array):
     vol = array
+    # if np.amax(vol) > 255:
+    #     print(np.min(vol))
+    #     vol[vol < 30] = 0
+    # else:
+    # vol -= np.max(vol[0:20,:,-1])
 
-    if np.amax(vol) > 255:
-        vol[vol < 30] = 0
-    else:
-        vol -= np.max(vol[0:20,:,-1])
+    vol = np.clip(array,0,np.percentile(vol,99.5))
+    vol -= np.mean(vol)
+    vol /= np.std(vol)
+    vol = -1 + 2 * (vol - np.min(vol)) / (np.max(vol) - np.min(vol))
 
-    vol = np.clip(vol,0,np.percentile(vol,99.5))
-    # vol /= np.max(vol)
+    return vol
+
+
+def CTNormalization(array):
+    
+    vol = np.clip(array, 0.001, 100)
 
     vol -= np.mean(vol)
     vol /= np.std(vol)
@@ -625,40 +634,31 @@ def simpleNormalization(array):
 
     return vol
 
-def CTNormalization(array):
-    vol = np.clip(array, 0.001, 100)
-    
-    # vol -= np.mean(vol)
-    # vol /= np.std(vol)
-    vol = -1 + 2 * (vol - np.min(vol)) / (np.max(vol) - np.min(vol))
-
-    return vol
 
 #1909.02642
-def intensityNormalization(img, N=50, augment=True):
+def intensityNormalization(img, N=0, augment=True):
 
-    #normalize
-    aug = np.clip(img, 30, np.percentile(img, 99.5)).astype(int) - 30
-    
+    #normalize intensity range
+    aug = np.clip(img, np.max(img[0:20,:,-1]), np.percentile(img, 99.5)).astype(int) - np.max(img[0:20,:,-1]).astype(int)
+
     #augment
     if augment:
-        random = np.random.uniform(np.min(aug), (np.max(aug)), size=(N + int(np.max(aug))))
+        random = np.random.uniform(np.min(aug), np.max(aug), size=(N + int(np.max(aug) + 1)))
         
         #moving average
         random = np.convolve(random, np.ones((N,))/N, mode='same')
         random = random[N//2:-N//2]
 
         #linear component
-        lin = np.arange(int(np.max(aug)))
+        lin = np.arange(int(np.max(aug)) + 1)
         sgn = np.random.uniform(-1,1)
         lin =  0.5 * sgn * (lin - lin[-1]/2)
         
         #add components and rescale
         prox = random + lin
         prox = np.max(aug) * (prox - np.min(prox)) / (np.max(prox) - np.min(prox))
-        
         #augmentation
-        for i, val in enumerate(np.arange(np.max(aug))):
+        for i, val in enumerate(np.arange(np.max(aug) + 1)):
             aug[aug == val] = prox[i]
     
     #rescale to [-1,1] 
